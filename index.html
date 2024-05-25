@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Card Maker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="./jszip/jszip.min.js"></script>
+</head>
+
+<body>
+
+  <template id="card-template">
+    <canvas width="180" height="291"></canvas>
+  </template>
+
+  <div class="conteiner h-64 flex w-screen m-0.5 flex-row">
+    <div id="drop-area" class="container mx-auto p-4 h-auto bg-gray-300">
+      <p>ここにJSONファイルをドロップ</p>
+    </div>
+
+    <div id="viewer" class="container mx-auto p-4 h-auto bg-gray-200 overflow-y-scroll"></div>
+  </div>
+
+  <button id="download-btn" type="button"
+    class="m-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">カード画像を一括ダウンロード</button>
+
+  <div id="cards-container" class="m-1 flex basis-1 flex-row gap-2 flex-wrap w-screen">
+
+  </div>
+
+  <script src="cardDraw.js"></script>
+  <script>
+
+    const handleDropAction = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const droppedFiles = e.dataTransfer.files;
+
+      if (droppedFiles.length > 0) {
+
+        //const file = droppedFiles[0];
+        const fileToCards = (file) => {
+          const ajaxData = new FormData();
+          ajaxData.append("file", file);
+          fetch("index.html", {}).then(response => {
+            const fr = new FileReader();
+            fr.onload = () => {
+              document.querySelector("#viewer").innerText = fr.result;
+              const cardsObject = JSON.parse(fr.result);
+              cardsObject.forEach((elm, idx) => {
+                makeCard(idx, elm);
+              });
+
+            };
+            fr.readAsText(file);
+
+          }).catch(err => {
+            document.querySelector("#viewer").innerText = JSON.stringify(err);
+          });
+        }
+        for ( file of droppedFiles ){
+          fileToCards(file);
+        }
+      }
+    };
+
+
+    const drop_area = document.querySelector("#drop-area");
+
+
+    ["drag", "dragstart", "dragend", "dragover", "dragenter", "dragleave"].forEach(event => {
+      drop_area.addEventListener(event, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    });
+
+
+    drop_area.addEventListener("drop", handleDropAction);
+
+    downloadCanvas = () => {
+      const cards = document.querySelectorAll("canvas[id^=card]");
+
+      const zip = new JSZip();
+
+      let addToZip = (zipObj, card) => {
+        return new Promise((resolve, reject) => {
+          card.toBlob(blob => {
+            console.log(card.attributes["data-cardname"].value);
+            zipObj.file(card.attributes["data-cardname"].value+".png", blob);
+            resolve();
+          }, "image/png", 1);
+        });
+      }
+
+      addToZipArr = [];
+      [...cards].map((elm, idx) => {
+        console.log(elm, idx);
+        return addToZipArr.push(addToZip(zip, elm));});
+
+      Promise.all(addToZipArr).then(() => {
+        zip.generateAsync({ type: "blob" }).then((compressData) => {
+          console.log("compressData", compressData);
+          let zipBlob = new Blob([compressData], { 'type': 'application/zip' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(zipBlob);
+          a.download = "cardset.zip";
+          a.click();
+        });
+      });
+
+    };
+
+    document.querySelector("#download-btn").addEventListener("click", downloadCanvas);
+
+  </script>
+
+</body>
+
+</html>
